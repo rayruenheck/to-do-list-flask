@@ -21,6 +21,8 @@ table = dynamodb.Table(table_name)
 
 
 
+
+
 @tasks_bp.route('/api/tasks', methods=['POST'])
 def handle_post():
     if request.method == 'POST':
