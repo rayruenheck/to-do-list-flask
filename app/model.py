@@ -1,6 +1,7 @@
 from flask_login import UserMixin
 import boto3
-from boto3.dynamodb.conditions import Attr 
+from boto3.dynamodb.conditions import Attr, Key 
+from werkzeug.security import check_password_hash
 
 
 
@@ -33,17 +34,24 @@ class TodoItem:
             'description': self.description,                       
             'is_completed': self.is_completed
         }
+
 class User(UserMixin):
-    def __init__(self, user_id, email, username, password):
-        self.user_id = user_id
-        self.email = email
-        self.username = username
-        self.password = password
+    def __init__(self, user_id, username=None):
+        self.dynamodb = dynamodb
+        self.table = table
+        self.id = user_id
+        
+        if username:
+            self.username = username
+        else:
+            item = self.table.get_item(Key={'email': user_id})
+            self.username = item['Item']['username']
+            self.password_hash = item['Item']['password_hash']
+            
     
     def to_dict(self):
         return {
-            'user_id' : self.user_id,
-            'email' : self.email,
+            'email' : self.id,
             'username' : self.username,
             'password' : self.password
         }
@@ -53,23 +61,19 @@ class User(UserMixin):
         if 'Items' in response:
             return response['Items'][0] if response['Items'] else None
     
-    def get_id(self):
-        return str(self.user_id)
-    
-    
-    
-    
-    @classmethod
-    def get_user_by_id(cls, user_id):
-        session_user_id = session.get('user_id')
-
-        if session_user_id and session_user_id == user_id:
+    def get_user_by_id(self):
+        response = table.scan(FilterExpression=Attr('user_id').eq(self.user_id))
         
-            return cls(
-                user_id=session_user_id,
-                email=session['email'],  
-                username=session['username'],  
-                password=session['password']  
-            )
+        if 'Items' in response:
+            return response['Items'][0] if response['Items'] else None
     
-        return None
+    def get_id(self):
+        return str(self.id)
+    
+    def verify_password(self, password):
+        return check_password_hash(self.password_hash, password)
+    
+    
+    
+    
+    
